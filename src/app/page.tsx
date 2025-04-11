@@ -18,8 +18,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const BASE_POINTS = 10;
 const MAX_STREAK = 5;
 
+// Type pour les données de log
+type LogData = Record<string, unknown>;
+
 // Fonction pour envoyer les logs à un endpoint
-async function sendLog(level: string, message: string, data?: any) {
+async function sendLog(level: string, message: string, data?: LogData) {
   try {
     await fetch('/api/log', {
       method: 'POST',
