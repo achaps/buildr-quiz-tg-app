@@ -18,6 +18,26 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const BASE_POINTS = 10;
 const MAX_STREAK = 5;
 
+// Fonction pour envoyer les logs à un endpoint
+async function sendLog(level: string, message: string, data?: any) {
+  try {
+    await fetch('/api/log', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        level,
+        message,
+        data,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to send log:', error);
+  }
+}
+
 export default function Home() {
   const [question, setQuestion] = useState<QuizQuestion | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,12 +48,10 @@ export default function Home() {
   useEffect(() => {
     async function fetchUserProgress() {
       try {
-        console.log('Starting fetchUserProgress');
-        console.log('Supabase URL:', supabaseUrl);
-        console.log('User:', user);
+        await sendLog('info', 'Starting fetchUserProgress', { supabaseUrl, user });
 
         if (!user) {
-          console.log('No user found, skipping fetch');
+          await sendLog('info', 'No user found, skipping fetch');
           setLoading(false);
           return;
         }
@@ -44,8 +62,7 @@ export default function Home() {
           .eq('telegram_id', user.id)
           .single();
         
-        console.log('Progress data:', progressData);
-        console.log('Progress error:', progressError);
+        await sendLog('info', 'Progress data fetched', { progressData, progressError });
         
         if (progressError && progressError.code !== 'PGRST116') {
           throw progressError;
@@ -60,7 +77,7 @@ export default function Home() {
           lastQuizDate.getMonth() === today.getMonth() && 
           lastQuizDate.getDate() === today.getDate();
         
-        console.log('Has answered today:', hasAnsweredToday);
+        await sendLog('info', 'Quiz status', { hasAnsweredToday });
         setCanAnswerToday(!hasAnsweredToday);
         
         if (hasAnsweredToday) {
@@ -69,10 +86,10 @@ export default function Home() {
         }
         
         let nextQuestionId = progressData?.next_question_id;
-        console.log('Next question ID:', nextQuestionId);
+        await sendLog('info', 'Next question ID', { nextQuestionId });
         
         if (!nextQuestionId) {
-          console.log('No next question ID, fetching first question');
+          await sendLog('info', 'No next question ID, fetching first question');
           const { data: firstQuestion, error: firstQuestionError } = await supabase
             .from('quiz_questions')
             .select('id')
@@ -80,8 +97,7 @@ export default function Home() {
             .limit(1)
             .single();
           
-          console.log('First question data:', firstQuestion);
-          console.log('First question error:', firstQuestionError);
+          await sendLog('info', 'First question fetched', { firstQuestion, firstQuestionError });
           
           if (firstQuestionError) throw firstQuestionError;
           
@@ -94,26 +110,26 @@ export default function Home() {
               next_question_id: nextQuestionId
             });
           
-          console.log('Create progress error:', createError);
+          await sendLog('info', 'Progress created', { createError });
           if (createError) throw createError;
         }
         
-        console.log('Fetching question with ID:', nextQuestionId);
+        await sendLog('info', 'Fetching question', { nextQuestionId });
         const { data: questionData, error: questionError } = await supabase
           .from('quiz_questions')
           .select('*')
           .eq('id', nextQuestionId)
           .single();
         
-        console.log('Question data:', questionData);
-        console.log('Question error:', questionError);
+        await sendLog('info', 'Question fetched', { questionData, questionError });
         
         if (questionError) throw questionError;
         
         setQuestion(questionData);
       } catch (err) {
-        console.error('Error in fetchUserProgress:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load question');
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load question';
+        await sendLog('error', 'Error in fetchUserProgress', { error: errorMessage, err });
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
