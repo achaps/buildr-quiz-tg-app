@@ -1,3 +1,11 @@
+export interface TgUser {
+  id: string;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+}
+
 export interface TelegramWebAppUser {
   id: number;
   first_name: string;
@@ -24,10 +32,8 @@ export interface TelegramWebAppInitData {
 }
 
 export interface TelegramWebApp {
-  initData: string;
-  initDataUnsafe: TelegramWebAppInitData;
-  version: string;
   platform: string;
+  version: string;
   colorScheme: 'light' | 'dark';
   themeParams: {
     bg_color: string;
@@ -48,19 +54,20 @@ export interface TelegramWebApp {
     isActive: boolean;
     isProgressVisible: boolean;
     setText: (text: string) => void;
-    onClick: (callback: () => void) => void;
-    offClick: (callback: () => void) => void;
+    onClick: (callback: () => void) => () => void;
+    offClick: (callback: () => void) => () => void;
     show: () => void;
     hide: () => void;
     enable: () => void;
     disable: () => void;
     showProgress: (leaveActive: boolean) => void;
     hideProgress: () => void;
+    setParams: (params: any) => void;
   };
   BackButton: {
     isVisible: boolean;
-    onClick: (callback: () => void) => void;
-    offClick: (callback: () => void) => void;
+    onClick: (callback: () => void) => () => void;
+    offClick: (callback: () => void) => () => void;
     show: () => void;
     hide: () => void;
   };
@@ -68,5 +75,9 @@ export interface TelegramWebApp {
     impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
     notificationOccurred: (type: 'error' | 'success' | 'warning') => void;
     selectionChanged: () => void;
+  };
+  expand: () => void;
+  initDataUnsafe?: {
+    user?: TgUser;
   };
 } 

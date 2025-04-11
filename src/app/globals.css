@@ -1,8 +1,18 @@
 @import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Default values that will be overridden by Telegram WebApp */
+  --tg-viewport-height: 100vh;
+  --tg-viewport-stable-height: 100vh;
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #2481cc;
+  --tg-theme-button-color: #2481cc;
+  --tg-theme-button-text-color: #ffffff;
 }
 
 @theme inline {
@@ -20,7 +30,42 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  min-height: var(--tg-viewport-height);
+  background-color: var(--tg-theme-bg-color);
+  color: var(--tg-theme-text-color);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Telegram WebApp specific styles */
+.tg-button {
+  background-color: var(--tg-theme-button-color);
+  color: var(--tg-theme-button-text-color);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.tg-button:hover {
+  opacity: 0.9;
+}
+
+.tg-button:active {
+  opacity: 0.8;
+}
+
+.tg-link {
+  color: var(--tg-theme-link-color);
+  text-decoration: none;
+}
+
+.tg-link:hover {
+  text-decoration: underline;
+}
+
+.tg-hint {
+  color: var(--tg-theme-hint-color);
+  font-size: 0.875rem;
 }
