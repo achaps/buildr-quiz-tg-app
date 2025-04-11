@@ -36,6 +36,7 @@ export function TelegramProvider({ children, overrideWebApp, overrideUser }: Tel
 
   useEffect(() => {
     if (overrideWebApp && overrideUser) {
+      console.log('Using override WebApp and User:', { overrideWebApp, overrideUser });
       setWebApp(overrideWebApp);
       setUser(overrideUser);
       setIsReady(true);
@@ -43,13 +44,24 @@ export function TelegramProvider({ children, overrideWebApp, overrideUser }: Tel
     }
 
     if (typeof window !== 'undefined') {
+      console.log('Window object available');
       const tg = window.Telegram?.WebApp;
+      console.log('Telegram WebApp object:', tg);
+      
       if (tg) {
+        console.log('Telegram WebApp found, initializing...');
+        console.log('Init data:', tg.initDataUnsafe);
+        console.log('User data:', tg.initDataUnsafe?.user);
+        
         setWebApp(tg);
         setUser(tg.initDataUnsafe?.user ?? null);
         setIsReady(true);
         tg.expand();
+      } else {
+        console.log('Telegram WebApp not found. Make sure you are running in Telegram.');
       }
+    } else {
+      console.log('Window object not available (server-side rendering)');
     }
   }, [overrideWebApp, overrideUser]);
 
