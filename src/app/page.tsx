@@ -6,6 +6,14 @@ import { DailyQuestion } from '@/components/quiz/DailyQuestion';
 import { QuizQuestion } from '@/types/quiz';
 import { useTelegram } from '@/components/layout/TelegramProvider';
 
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: any;
+    };
+  }
+}
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
