@@ -28,7 +28,12 @@ export default function Home() {
   useEffect(() => {
     async function fetchUserProgress() {
       try {
+        console.log('Starting fetchUserProgress');
+        console.log('Supabase URL:', supabaseUrl);
+        console.log('User:', user);
+
         if (!user) {
+          console.log('No user found, skipping fetch');
           setLoading(false);
           return;
         }
@@ -38,6 +43,9 @@ export default function Home() {
           .select('*')
           .eq('telegram_id', user.id)
           .single();
+        
+        console.log('Progress data:', progressData);
+        console.log('Progress error:', progressError);
         
         if (progressError && progressError.code !== 'PGRST116') {
           throw progressError;
@@ -52,6 +60,7 @@ export default function Home() {
           lastQuizDate.getMonth() === today.getMonth() && 
           lastQuizDate.getDate() === today.getDate();
         
+        console.log('Has answered today:', hasAnsweredToday);
         setCanAnswerToday(!hasAnsweredToday);
         
         if (hasAnsweredToday) {
@@ -60,14 +69,19 @@ export default function Home() {
         }
         
         let nextQuestionId = progressData?.next_question_id;
+        console.log('Next question ID:', nextQuestionId);
         
         if (!nextQuestionId) {
+          console.log('No next question ID, fetching first question');
           const { data: firstQuestion, error: firstQuestionError } = await supabase
             .from('quiz_questions')
             .select('id')
             .order('created_at', { ascending: true })
             .limit(1)
             .single();
+          
+          console.log('First question data:', firstQuestion);
+          console.log('First question error:', firstQuestionError);
           
           if (firstQuestionError) throw firstQuestionError;
           
@@ -80,19 +94,25 @@ export default function Home() {
               next_question_id: nextQuestionId
             });
           
+          console.log('Create progress error:', createError);
           if (createError) throw createError;
         }
         
+        console.log('Fetching question with ID:', nextQuestionId);
         const { data: questionData, error: questionError } = await supabase
           .from('quiz_questions')
           .select('*')
           .eq('id', nextQuestionId)
           .single();
         
+        console.log('Question data:', questionData);
+        console.log('Question error:', questionError);
+        
         if (questionError) throw questionError;
         
         setQuestion(questionData);
       } catch (err) {
+        console.error('Error in fetchUserProgress:', err);
         setError(err instanceof Error ? err.message : 'Failed to load question');
       } finally {
         setLoading(false);
