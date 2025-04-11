@@ -58,7 +58,7 @@ export default function Home() {
         const uuid = `00000000-0000-0000-0000-${telegramId.padStart(12, '0')}`;
 
         // Sign in anonymously with the user's Telegram ID
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        const { error: authError } = await supabase.auth.signInWithPassword({
           email: `${uuid}@telegram.user`,
           password: uuid,
         });

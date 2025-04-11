@@ -80,4 +80,5 @@ export interface TelegramWebApp {
   initDataUnsafe?: {
     user?: TgUser;
   };
+  showPopup: (params: { title: string; message: string; buttons: { type: string }[] }) => void;
 } 

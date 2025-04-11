@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useTelegram } from '@/hooks/useTelegram';
 import { QuizQuestion } from '@/types/quiz';
-import { createClient } from '@supabase/supabase-js';
 
 interface DailyQuestionProps {
   question: QuizQuestion;
