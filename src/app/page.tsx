@@ -49,6 +49,44 @@ export default function Home() {
   const { webApp, user } = useTelegram();
 
   useEffect(() => {
+    async function initializeSupabase() {
+      if (!user) return;
+
+      try {
+        // Convertir l'ID Telegram en UUID valide
+        const telegramId = user.id.toString();
+        const uuid = `00000000-0000-0000-0000-${telegramId.padStart(12, '0')}`;
+
+        // Sign in anonymously with the user's Telegram ID
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: `${uuid}@telegram.user`,
+          password: uuid,
+        });
+
+        if (authError) {
+          // If user doesn't exist, create a new one
+          if (authError.message.includes('Invalid login credentials')) {
+            const { error: signUpError } = await supabase.auth.signUp({
+              email: `${uuid}@telegram.user`,
+              password: uuid,
+            });
+
+            if (signUpError) throw signUpError;
+          } else {
+            throw authError;
+          }
+        }
+
+        await sendLog('info', 'Supabase authentication successful', { userId: uuid });
+      } catch (err) {
+        await sendLog('error', 'Supabase authentication failed', { error: err });
+      }
+    }
+
+    initializeSupabase();
+  }, [user]);
+
+  useEffect(() => {
     async function fetchUserProgress() {
       try {
         await sendLog('info', 'Starting fetchUserProgress', { supabaseUrl, user });
@@ -227,10 +265,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading question...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="text-gray-900">Loading your daily question...</p>
         </div>
       </div>
     );
@@ -238,9 +276,15 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-red-600">Error: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -269,9 +313,10 @@ export default function Home() {
 
   if (!question) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-gray-600">No questions available.</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="text-gray-900">Preparing your question...</p>
         </div>
       </div>
     );

@@ -17,7 +17,7 @@ interface TelegramContextType {
   isReady: boolean;
 }
 
-const TelegramContext = createContext<TelegramContextType>({
+export const TelegramContext = createContext<TelegramContextType>({
   webApp: null,
   user: null,
   isReady: false,

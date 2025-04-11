@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useTelegram } from '@/components/layout/TelegramProvider';
+import { useTelegram } from '@/hooks/useTelegram';
 import { QuizQuestion } from '@/types/quiz';
+import { createClient } from '@supabase/supabase-js';
 
 interface DailyQuestionProps {
   question: QuizQuestion;
@@ -14,7 +15,7 @@ export function DailyQuestion({ question, onAnswer }: DailyQuestionProps) {
   const [isAnswered, setIsAnswered] = useState(false);
   const { webApp } = useTelegram();
 
-  const handleAnswerSelect = (index: number) => {
+  const handleAnswer = async (index: number) => {
     if (isAnswered) return;
     
     setSelectedAnswer(index);
@@ -23,53 +24,42 @@ export function DailyQuestion({ question, onAnswer }: DailyQuestionProps) {
     const isCorrect = index === question.correct_answer_index;
     onAnswer(isCorrect);
 
-    // Provide haptic feedback
-    if (webApp?.HapticFeedback) {
-      webApp.HapticFeedback.impactOccurred(isCorrect ? 'medium' : 'heavy');
+    // Show feedback
+    if (webApp) {
+      webApp.HapticFeedback.impactOccurred('medium');
+      webApp.showPopup({
+        title: isCorrect ? 'Correct!' : 'Incorrect',
+        message: isCorrect 
+          ? `You earned ${question.points} points!` 
+          : `The correct answer was: ${question.answers[question.correct_answer_index]}`,
+        buttons: [{ type: 'ok' }]
+      });
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-lg p-6 shadow-sm">
-        <h2 className="text-xl font-semibold mb-4">{question.question}</h2>
-        
-        <div className="space-y-3">
-          {question.answers.map((answer, index) => (
-            <button
-              key={index}
-              onClick={() => handleAnswerSelect(index)}
-              disabled={isAnswered}
-              className={`w-full p-4 text-left rounded-lg border transition-colors ${
-                isAnswered
-                  ? index === question.correct_answer_index
-                    ? 'bg-green-50 border-green-500 text-green-700'
-                    : selectedAnswer === index
-                    ? 'bg-red-50 border-red-500 text-red-700'
-                    : 'bg-gray-50 border-gray-200'
-                  : 'hover:bg-gray-50 border-gray-200'
-              }`}
-            >
-              {answer}
-            </button>
-          ))}
-        </div>
+    <div className="p-4 space-y-6">
+      <h2 className="text-xl font-bold text-gray-900">{question.question}</h2>
+      <div className="space-y-3">
+        {question.answers.map((answer, index) => (
+          <button
+            key={index}
+            onClick={() => handleAnswer(index)}
+            disabled={isAnswered}
+            className={`w-full p-4 rounded-lg text-left transition-colors ${
+              isAnswered
+                ? index === question.correct_answer_index
+                  ? 'bg-green-100 text-green-900'
+                  : selectedAnswer === index
+                  ? 'bg-red-100 text-red-900'
+                  : 'bg-gray-100 text-gray-900'
+                : 'bg-white text-gray-900 hover:bg-gray-50 border border-gray-200'
+            }`}
+          >
+            {answer}
+          </button>
+        ))}
       </div>
-
-      {isAnswered && (
-        <div className="text-center">
-          <p className="text-lg font-medium">
-            {selectedAnswer === question.correct_answer_index
-              ? 'Correct! 🎉'
-              : 'Incorrect! 😕'}
-          </p>
-          <p className="text-sm text-gray-600 mt-2">
-            {selectedAnswer === question.correct_answer_index
-              ? `You earned ${question.points} points!`
-              : `The correct answer was: ${question.answers[question.correct_answer_index]}`}
-          </p>
-        </div>
-      )}
     </div>
   );
 } 
