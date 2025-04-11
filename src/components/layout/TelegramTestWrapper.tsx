@@ -64,26 +64,26 @@ const mockTelegramWebApp: TelegramWebApp = {
       console.log('Hide main button progress');
       mockTelegramWebApp.MainButton.isProgressVisible = false;
     },
-    setParams: (params: any) => {
+    setParams: (params: Partial<typeof mockTelegramWebApp.MainButton>) => {
       console.log('Set main button params:', params);
       Object.assign(mockTelegramWebApp.MainButton, params);
     },
-    onClick: (callback: () => void) => {
+    onClick: () => {
       console.log('Add main button click handler');
       return () => console.log('Remove main button click handler');
     },
-    offClick: (callback: () => void) => {
+    offClick: () => {
       console.log('Remove main button click handler');
       return () => console.log('Add main button click handler');
     },
   },
   BackButton: {
     isVisible: false,
-    onClick: (callback: () => void) => {
+    onClick: () => {
       console.log('Add back button click handler');
       return () => console.log('Remove back button click handler');
     },
-    offClick: (callback: () => void) => {
+    offClick: () => {
       console.log('Remove back button click handler');
       return () => console.log('Add back button click handler');
     },
@@ -111,9 +111,10 @@ export function TelegramTestWrapper({ children }: { children: React.ReactNode })
   // Simuler window.Telegram.WebApp
   if (typeof window !== 'undefined') {
     if (!window.Telegram) {
-      window.Telegram = {} as any;
+      window.Telegram = { WebApp: mockTelegramWebApp };
+    } else {
+      window.Telegram.WebApp = mockTelegramWebApp;
     }
-    window.Telegram.WebApp = mockTelegramWebApp as any;
   }
 
   return (

@@ -62,7 +62,7 @@ export interface TelegramWebApp {
     disable: () => void;
     showProgress: (leaveActive: boolean) => void;
     hideProgress: () => void;
-    setParams: (params: any) => void;
+    setParams: (params: Partial<TelegramWebApp['MainButton']>) => void;
   };
   BackButton: {
     isVisible: boolean;

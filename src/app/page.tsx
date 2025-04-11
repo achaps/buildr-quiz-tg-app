@@ -6,14 +6,6 @@ import { DailyQuestion } from '@/components/quiz/DailyQuestion';
 import { QuizQuestion } from '@/types/quiz';
 import { useTelegram } from '@/components/layout/TelegramProvider';
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp: any;
-    };
-  }
-}
-
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -229,7 +221,7 @@ export default function Home() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-gray-600">You've already answered today's question!</p>
+          <p className="text-gray-600">You&apos;ve already answered today&apos;s question!</p>
           <p className="text-sm text-gray-500 mt-2">Come back tomorrow for the next question.</p>
         </div>
       </div>
