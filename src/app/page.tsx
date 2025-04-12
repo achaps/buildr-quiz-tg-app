@@ -29,10 +29,11 @@ interface ProgressData {
 
 export default function Home() {
   const [question, setQuestion] = useState<QuizQuestion | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canAnswerToday, setCanAnswerToday] = useState(true);
   const [userStats, setUserStats] = useState<{ streak: number; total_points: number }>({ streak: 0, total_points: 0 });
+  const [isQuizStarted, setIsQuizStarted] = useState(false);
   const { user } = useTelegram();
 
   useEffect(() => {
@@ -100,50 +101,65 @@ export default function Home() {
           lastQuizDate.getDate() === today.getDate();
         
         setCanAnswerToday(!hasAnsweredToday);
-
-        if (!hasAnsweredToday) {
-          let nextQuestionId = progressData?.next_question_id;
-          
-          if (!nextQuestionId) {
-            const { data: firstQuestion } = await supabase
-              .from('quiz_questions')
-              .select('id')
-              .order('created_at', { ascending: true })
-              .limit(1)
-              .single();
-            
-            nextQuestionId = firstQuestion?.id;
-            
-            if (nextQuestionId) {
-              await supabase
-                .from('quiz_user_progress')
-                .insert({
-                  telegram_id: user.id,
-                  next_question_id: nextQuestionId
-                });
-            }
-          }
-          
-          if (nextQuestionId) {
-            const { data: questionData } = await supabase
-              .from('quiz_questions')
-              .select('*')
-              .eq('id', nextQuestionId)
-              .single();
-            
-            setQuestion(questionData);
-          }
-        }
       } catch (err) {
         console.error('Error fetching user data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
-      } finally {
-        setLoading(false);
       }
     }
 
     fetchUserData();
   }, [user]);
+
+  const startQuiz = async () => {
+    if (!user) return;
+    setLoading(true);
+
+    try {
+      const { data: progressData } = await supabase
+        .from('quiz_user_progress')
+        .select('next_question_id')
+        .eq('telegram_id', user.id)
+        .single();
+
+      let nextQuestionId = progressData?.next_question_id;
+      
+      if (!nextQuestionId) {
+        const { data: firstQuestion } = await supabase
+          .from('quiz_questions')
+          .select('id')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .single();
+        
+        nextQuestionId = firstQuestion?.id;
+        
+        if (nextQuestionId) {
+          await supabase
+            .from('quiz_user_progress')
+            .insert({
+              telegram_id: user.id,
+              next_question_id: nextQuestionId
+            });
+        }
+      }
+      
+      if (nextQuestionId) {
+        const { data: questionData } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('id', nextQuestionId)
+          .single();
+        
+        setQuestion(questionData);
+        setIsQuizStarted(true);
+      }
+    } catch (err) {
+      console.error('Error starting quiz:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start quiz');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAnswer = async (isCorrect: boolean) => {
     if (!user || !question) return;
@@ -233,7 +249,7 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="text-gray-900">Loading...</p>
+          <p className="text-gray-900">Loading your question...</p>
         </div>
       </div>
     );
@@ -265,7 +281,7 @@ export default function Home() {
     );
   }
 
-  if (question && canAnswerToday) {
+  if (isQuizStarted && question) {
     return (
       <main className="min-h-screen bg-white p-4">
         <DailyQuestion question={question} onAnswer={handleAnswer} />
@@ -298,7 +314,7 @@ export default function Home() {
         </div>
 
         <button
-          onClick={() => window.location.reload()}
+          onClick={startQuiz}
           disabled={!canAnswerToday}
           className={`w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all ${
             canAnswerToday
@@ -306,7 +322,7 @@ export default function Home() {
               : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {canAnswerToday ? '➡️ Start Daily Quiz' : '⌛️ Come back tomorrow for a new Quiz'}
+          {canAnswerToday ? '➡️ Start Daily Quiz' : '⌛️ Next Quiz in 24h'}
         </button>
       </div>
     </main>
