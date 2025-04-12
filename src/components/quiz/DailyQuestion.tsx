@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTelegram } from '@/hooks/useTelegram';
+import { useTelegram } from '@/components/layout/TelegramProvider';
 import { QuizQuestion } from '@/types/quiz';
 
 interface DailyQuestionProps {
@@ -12,6 +12,7 @@ interface DailyQuestionProps {
 export function DailyQuestion({ question, onAnswer }: DailyQuestionProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const { webApp } = useTelegram();
 
   const handleAnswer = async (index: number) => {
@@ -20,45 +21,57 @@ export function DailyQuestion({ question, onAnswer }: DailyQuestionProps) {
     setSelectedAnswer(index);
     setIsAnswered(true);
     
-    const isCorrect = index === question.correct_answer_index;
-    onAnswer(isCorrect);
+    const correct = index === question.correct_answer_index;
+    setIsCorrect(correct);
+    onAnswer(correct);
 
-    // Show feedback
     if (webApp) {
       webApp.HapticFeedback.impactOccurred('medium');
-      webApp.showPopup({
-        title: isCorrect ? 'Correct!' : 'Incorrect',
-        message: isCorrect 
-          ? `You earned ${question.points} points!` 
-          : `The correct answer was: ${question.answers[question.correct_answer_index]}`,
-        buttons: [{ type: 'ok' }]
-      });
     }
+  };
+
+  const handleContinue = () => {
+    window.location.reload();
   };
 
   return (
     <div className="p-4 space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">{question.question}</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-6">{question.question}</h2>
       <div className="space-y-3">
         {question.answers.map((answer, index) => (
           <button
             key={index}
             onClick={() => handleAnswer(index)}
             disabled={isAnswered}
-            className={`w-full p-4 rounded-lg text-left transition-colors ${
+            className={`w-full p-4 rounded-xl text-left transition-all ${
               isAnswered
                 ? index === question.correct_answer_index
-                  ? 'bg-green-100 text-green-900'
+                  ? 'bg-green-100 text-green-900 border-2 border-green-500'
                   : selectedAnswer === index
-                  ? 'bg-red-100 text-red-900'
-                  : 'bg-gray-100 text-gray-900'
-                : 'bg-white text-gray-900 hover:bg-gray-50 border border-gray-200'
+                  ? 'bg-red-100 text-red-900 border-2 border-red-500'
+                  : 'bg-gray-50 text-gray-500'
+                : 'bg-white text-gray-900 hover:bg-gray-50 border border-gray-200 shadow-sm'
             }`}
           >
             {answer}
           </button>
         ))}
       </div>
+
+      {isAnswered && (
+        <div className="mt-8 space-y-4">
+          <button
+            onClick={handleContinue}
+            className={`w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all ${
+              isCorrect
+                ? 'bg-green-600 text-white hover:bg-green-700 active:bg-green-800'
+                : 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800'
+            }`}
+          >
+            {isCorrect ? '🪙 Collect 10 pBUILDR' : '❌ Wrong, try again tomorrow!'}
+          </button>
+        </div>
+      )}
     </div>
   );
 } 

@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { DailyQuestion } from '@/components/quiz/DailyQuestion';
 import { QuizQuestion } from '@/types/quiz';
 import { useTelegram } from '@/components/layout/TelegramProvider';
+import Image from 'next/image';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,27 +19,12 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const BASE_POINTS = 10;
 const MAX_STREAK = 5;
 
-// Type pour les données de log
-type LogData = Record<string, unknown>;
-
-// Fonction pour envoyer les logs à un endpoint
-async function sendLog(level: string, message: string, data?: LogData) {
-  try {
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        level,
-        message,
-        data,
-        timestamp: new Date().toISOString(),
-      }),
-    });
-  } catch (error) {
-    console.error('Failed to send log:', error);
-  }
+interface ProgressData {
+  streak: number;
+  last_quiz_date: string | null;
+  next_question_id: string | null;
+  last_streak_date: string | null;
+  quiz_points: number;
 }
 
 export default function Home() {
@@ -46,25 +32,23 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canAnswerToday, setCanAnswerToday] = useState(true);
-  const { webApp, user } = useTelegram();
+  const [userStats, setUserStats] = useState<{ streak: number; total_points: number }>({ streak: 0, total_points: 0 });
+  const { user } = useTelegram();
 
   useEffect(() => {
     async function initializeSupabase() {
       if (!user) return;
 
       try {
-        // Convertir l'ID Telegram en UUID valide
         const telegramId = user.id.toString();
         const uuid = `00000000-0000-0000-0000-${telegramId.padStart(12, '0')}`;
 
-        // Sign in anonymously with the user's Telegram ID
         const { error: authError } = await supabase.auth.signInWithPassword({
           email: `${uuid}@telegram.user`,
           password: uuid,
         });
 
         if (authError) {
-          // If user doesn't exist, create a new one
           if (authError.message.includes('Invalid login credentials')) {
             const { error: signUpError } = await supabase.auth.signUp({
               email: `${uuid}@telegram.user`,
@@ -76,10 +60,8 @@ export default function Home() {
             throw authError;
           }
         }
-
-        await sendLog('info', 'Supabase authentication successful', { userId: uuid });
       } catch (err) {
-        await sendLog('error', 'Supabase authentication failed', { error: err });
+        console.error('Authentication error:', err);
       }
     }
 
@@ -87,28 +69,27 @@ export default function Home() {
   }, [user]);
 
   useEffect(() => {
-    async function fetchUserProgress() {
+    async function fetchUserData() {
+      if (!user) return;
+
       try {
-        await sendLog('info', 'Starting fetchUserProgress', { supabaseUrl, user });
-
-        if (!user) {
-          await sendLog('info', 'No user found, skipping fetch');
-          setLoading(false);
-          return;
-        }
-
-        const { data: progressData, error: progressError } = await supabase
+        const { data: progressData } = await supabase
           .from('quiz_user_progress')
-          .select('*')
+          .select('streak, last_quiz_date, next_question_id, last_streak_date, quiz_points')
+          .eq('telegram_id', user.id)
+          .single() as { data: ProgressData | null };
+
+        const { data: userData } = await supabase
+          .from('tg-users')
+          .select('total_points')
           .eq('telegram_id', user.id)
           .single();
-        
-        await sendLog('info', 'Progress data fetched', { progressData, progressError });
-        
-        if (progressError && progressError.code !== 'PGRST116') {
-          throw progressError;
-        }
-        
+
+        setUserStats({
+          streak: progressData?.streak || 0,
+          total_points: userData?.total_points || 0
+        });
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -118,65 +99,50 @@ export default function Home() {
           lastQuizDate.getMonth() === today.getMonth() && 
           lastQuizDate.getDate() === today.getDate();
         
-        await sendLog('info', 'Quiz status', { hasAnsweredToday });
         setCanAnswerToday(!hasAnsweredToday);
-        
-        if (hasAnsweredToday) {
-          setLoading(false);
-          return;
+
+        if (!hasAnsweredToday) {
+          let nextQuestionId = progressData?.next_question_id;
+          
+          if (!nextQuestionId) {
+            const { data: firstQuestion } = await supabase
+              .from('quiz_questions')
+              .select('id')
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .single();
+            
+            nextQuestionId = firstQuestion?.id;
+            
+            if (nextQuestionId) {
+              await supabase
+                .from('quiz_user_progress')
+                .insert({
+                  telegram_id: user.id,
+                  next_question_id: nextQuestionId
+                });
+            }
+          }
+          
+          if (nextQuestionId) {
+            const { data: questionData } = await supabase
+              .from('quiz_questions')
+              .select('*')
+              .eq('id', nextQuestionId)
+              .single();
+            
+            setQuestion(questionData);
+          }
         }
-        
-        let nextQuestionId = progressData?.next_question_id;
-        await sendLog('info', 'Next question ID', { nextQuestionId });
-        
-        if (!nextQuestionId) {
-          await sendLog('info', 'No next question ID, fetching first question');
-          const { data: firstQuestion, error: firstQuestionError } = await supabase
-            .from('quiz_questions')
-            .select('id')
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .single();
-          
-          await sendLog('info', 'First question fetched', { firstQuestion, firstQuestionError });
-          
-          if (firstQuestionError) throw firstQuestionError;
-          
-          nextQuestionId = firstQuestion.id;
-          
-          const { error: createError } = await supabase
-            .from('quiz_user_progress')
-            .insert({
-              telegram_id: user.id,
-              next_question_id: nextQuestionId
-            });
-          
-          await sendLog('info', 'Progress created', { createError });
-          if (createError) throw createError;
-        }
-        
-        await sendLog('info', 'Fetching question', { nextQuestionId });
-        const { data: questionData, error: questionError } = await supabase
-          .from('quiz_questions')
-          .select('*')
-          .eq('id', nextQuestionId)
-          .single();
-        
-        await sendLog('info', 'Question fetched', { questionData, questionError });
-        
-        if (questionError) throw questionError;
-        
-        setQuestion(questionData);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load question';
-        await sendLog('error', 'Error in fetchUserProgress', { error: errorMessage, err });
-        setError(errorMessage);
+        console.error('Error fetching user data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchUserProgress();
+    fetchUserData();
   }, [user]);
 
   const handleAnswer = async (isCorrect: boolean) => {
@@ -221,7 +187,7 @@ export default function Home() {
         .limit(1)
         .single();
       
-      const { error: updateError } = await supabase
+      await supabase
         .from('quiz_user_progress')
         .update({
           last_quiz_date: new Date().toISOString(),
@@ -232,8 +198,6 @@ export default function Home() {
         })
         .eq('telegram_id', user.id);
       
-      if (updateError) throw updateError;
-      
       if (isCorrect) {
         const { data: userData } = await supabase
           .from('tg-users')
@@ -243,32 +207,33 @@ export default function Home() {
 
         const newPoints = (userData?.total_points || 0) + pointsToAdd;
         
-        const { error: updatePointsError } = await supabase
+        await supabase
           .from('tg-users')
           .update({
             total_points: newPoints
           })
           .eq('telegram_id', user.id);
         
-        if (updatePointsError) throw updatePointsError;
-      }
-      
-      if (webApp?.MainButton) {
-        webApp.MainButton.hide();
+        setUserStats(prev => ({
+          ...prev,
+          streak: newStreak,
+          total_points: newPoints
+        }));
       }
       
       setCanAnswerToday(false);
     } catch (err) {
+      console.error('Error handling answer:', err);
       setError(err instanceof Error ? err.message : 'Failed to handle answer');
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="text-gray-900">Loading your daily question...</p>
+          <p className="text-gray-900">Loading...</p>
         </div>
       </div>
     );
@@ -276,7 +241,7 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center space-y-4">
           <p className="text-red-600">Error: {error}</p>
           <button 
@@ -292,7 +257,7 @@ export default function Home() {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
           <p className="text-gray-600">Please open this app in Telegram.</p>
         </div>
@@ -300,31 +265,50 @@ export default function Home() {
     );
   }
 
-  if (!canAnswerToday) {
+  if (question && canAnswerToday) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-gray-600">You&apos;ve already answered today&apos;s question!</p>
-          <p className="text-sm text-gray-500 mt-2">Come back tomorrow for the next question.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!question) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="text-gray-900">Preparing your question...</p>
-        </div>
-      </div>
+      <main className="min-h-screen bg-white p-4">
+        <DailyQuestion question={question} onAnswer={handleAnswer} />
+      </main>
     );
   }
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <DailyQuestion question={question} onAnswer={handleAnswer} />
+    <main className="min-h-screen bg-white p-4 flex flex-col items-center">
+      <div className="w-full max-w-md space-y-8">
+        <div className="flex justify-center">
+          <Image
+            src="/buildr-network-logo.png"
+            alt="Buildr Network Logo"
+            width={200}
+            height={200}
+            className="mb-8"
+          />
+        </div>
+        
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center space-x-2">
+            <span className="text-2xl">🔥</span>
+            <span className="text-gray-900 font-semibold">Streak {userStats.streak}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-2xl">💰</span>
+            <span className="text-gray-900 font-semibold">{userStats.total_points} pBUILDR</span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => window.location.reload()}
+          disabled={!canAnswerToday}
+          className={`w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all ${
+            canAnswerToday
+              ? 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {canAnswerToday ? '➡️ Start Daily Quiz' : '⌛️ Come back tomorrow for a new Quiz'}
+        </button>
+      </div>
     </main>
   );
 }
